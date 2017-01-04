@@ -9,6 +9,8 @@ comments (indented).
 If you are willing to reveal your identity, we will happily thank you in the
 paper!
 
+>> Hi.
+
 > This was an interesting and entertaining read. Price-Whelan et al have
 > developed an innovative (and rather crazy, or, more charitably, ambitious)
 > approach to sampling the posterior distribution for orbital parameters given
@@ -26,6 +28,8 @@ paper!
 >   for being dense, but I don't get it.
 
 It's short for Johannes Kepler.
+
+>> Nice. Perhaps you could mention this in the acknowledgements.
 
 > - Regarding the above point about measuring the undetectable, it might be
 >   worth referring to one or two papers outside of exoplanets where that kind
@@ -190,6 +194,14 @@ Fixed.
 >   moderate the wording here?
 
 Could you highlight what specifically you would like to see moderated? Thanks!
+
+>> I re-read that paragraph and I think I was really only put off by the last
+>> sentence, which sounds a bit like advertising. The facts that
+>> i) underestimated error bars lead to overconfidently sharp inferences;
+>> ii) something like a jitter term can compensate for this
+>> are properties that come from Bayesian inference, and are not specific
+>> to The Joker. Any working computational implementation of these assumptions
+>> would lead to the same behaviour.
 
 > - Section 3.3, final paragraph: "day and re-use these ...": day -> days
 
