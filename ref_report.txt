@@ -1,3 +1,8 @@
+We thank the referee for a constructive and useful report! We hope we have
+addressed the referee's concerns; we've updated the manuscript (in red where
+changes have been made) and added responses below in-line below the referee's
+comments (indented).
+
 > Note: The authors will probably be able to infer my identity from these
 > remarks. I am fine with that.
 
@@ -16,10 +21,6 @@ paper!
 > published eventually. The plots are beautiful and help reinforce the ideas
 > very well (they illustrate generic features of this data analysis problem
 > very clearly). But I have a few criticisms, listed below.
-
-We thank the referee for a constructive and useful report! We hope we have
-addressed the referee's concerns; we've updated the manuscript (in red where
-changes have been made) and added responses below in-line.
 
 > - What is the origin and significance of the title "The Joker"? Forgive me
 >   for being dense, but I don't get it.
