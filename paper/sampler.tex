@@ -50,7 +50,8 @@
 
 % response to referee
 \definecolor{mahogany}{RGB}{165,15,21}
-\newcommand{\resp}[1]{{\color{mahogany}#1}}
+% \newcommand{\resp}[1]{{\color{mahogany}#1}}
+\newcommand{\resp}[1]{#1}
 
 % For experiments
 \newcounter{expcounter}
@@ -189,7 +190,7 @@ While the problem has of course been recognized for a long time, there are
 currently no methods that explore these highly multimodal
 \resp{distributions} with good guarantees of \resp{converged samplings} (but see
 \citealt{Gregory:2005,Brewer:2015}).
-\resp{Converged, indepdendent samplings are essential to the jobs of delivering
+\resp{Converged, independent samplings are essential to the jobs of delivering
 correct posterior samplings and reliable probabilistic statements about
 detection and characterization.
 With general Markov Chain Monte Carlo (MCMC) methods, the returned samplings are
