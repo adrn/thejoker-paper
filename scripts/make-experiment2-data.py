@@ -16,37 +16,36 @@ matplotlib.use('agg')
 import numpy as np
 
 # Project
-from thejoker import Paths
-paths = Paths()
-from thejoker.celestialmechanics import OrbitalParams
+from thejoker.celestialmechanics import SimulatedRVOrbit
 from thejoker.data import RVData
-from thejoker.units import default_units
+from thejoker.utils import quantity_to_hdf5
 
 def main():
 
+    kms = u.km/u.s
+    if not os.path.exists(os.path.abspath("../scripts")):
+        raise RuntimeError("Script must be run from within the scripts directory.")
+
+    cache_path = os.path.abspath("../cache")
+    if not os.path.exists(cache_path):
+        os.makedirs(cache_path)
+
     # high-eccentricity orbit with reasonable or randomly chosen parameters
-    opars = OrbitalParams(P=103.71*u.day, K=1.134*u.km/u.s, ecc=0.313,
-                          omega=np.random.uniform(0, 2*np.pi)*u.rad,
-                          phi0=np.random.uniform(0, 2*np.pi)*u.rad,
-                          v0=np.random.normal(0, 30) * u.km/u.s)
-    orbit = opars.rv_orbit(0)
-    print("Mass function:", orbit.pars.mf)
-    print("omega:", orbit.pars.omega.to(u.degree))
-    print("phi0:", orbit.pars.phi0.to(u.degree))
-    print("v0:", orbit.pars.v0.to(u.km/u.s))
-    print("asini:", orbit.pars.asini.to(u.Rsun))
+    opars = dict(P=103.71*u.day, K=1.134*kms, ecc=0.313,
+                 omega=np.random.uniform(0, 2*np.pi)*u.rad,
+                 phi0=np.random.uniform(0, 2*np.pi)*u.rad,
+                 v0=np.random.normal(0, 30) * kms)
+    orbit = SimulatedRVOrbit(**opars)
 
-    n_obs = 5 # MAGIC NUMBER: number of observations
+    n_obs = 5 # number of observations
 
-    # Experiment 1 data
     bmjd = np.random.uniform(0, 3*365, size=n_obs) + 55555. # 3 year survey
     bmjd.sort()
     rv = orbit.generate_rv_curve(bmjd)
     rv_err = np.random.uniform(100, 200, size=n_obs) * u.m/u.s # apogee-like
-    rv = np.random.normal(rv.to(default_units['v0']).value,
-                          rv_err.to(default_units['v0']).value) * default_units['v0']
+    rv = np.random.normal(rv.to(kms).value, rv_err.to(kms).value) * kms
 
-    with h5py.File(os.path.join(paths.root, "data", "experiment2.h5"), "w") as f:
+    with h5py.File(os.path.join(cache_path, "experiment2.h5"), "w") as f:
         data1 = RVData(t=bmjd, rv=rv, stddev=rv_err)
         g = f.create_group('a')
         data1.to_hdf5(g)
@@ -56,7 +55,8 @@ def main():
         data2.to_hdf5(g)
 
         g = f.create_group('truth')
-        opars.to_hdf5(g)
+        for k in opars:
+            quantity_to_hdf5(g, k, opars[k])
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

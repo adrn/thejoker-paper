@@ -16,24 +16,29 @@ import h5py
 import numpy as np
 
 # Project
-from thejoker import Paths
-paths = Paths()
-from thejoker.celestialmechanics import OrbitalParams
+from thejoker.celestialmechanics import SimulatedRVOrbit
 from thejoker.data import RVData
+from thejoker.utils import quantity_to_hdf5
 
 def main():
 
-    # Designer RV curves!
+    kms = u.km/u.s
+    if not os.path.exists(os.path.abspath("../scripts")):
+        raise RuntimeError("Script must be run from within the scripts directory.")
 
-    opars = OrbitalParams(P=127.31*u.day, K=8.996045*u.km/u.s, ecc=0.213,
-                          omega=137.234*u.degree,
-                          phi0=36.231*u.degree,
-                          v0=17.643*u.km/u.s)
-    orbit = opars.rv_orbit(0)
+    cache_path = os.path.abspath("../cache")
+    if not os.path.exists(cache_path):
+        os.makedirs(cache_path)
+
+    opars = dict(P=127.31*u.day, K=8.996045*kms, ecc=0.213,
+                 omega=137.234*u.degree,
+                 phi0=36.231*u.degree,
+                 v0=17.643*kms)
+    orbit = SimulatedRVOrbit(**opars)
 
     EPOCH = 55555. # arbitrary number
-    P = opars.P.to(u.day).value[0]
-    f0 = opars._phi0[0]/(2*np.pi)
+    P = opars['P'].to(u.day).value
+    f0 = opars['phi0'].to(u.radian).value / (2*np.pi)
     _t = (np.array([0.02, 4.08, 4.45, 4.47]) + f0) * P
 
     ts = [
@@ -42,7 +47,7 @@ def main():
         np.concatenate((_t, (np.array([6.62, 6.65]) + f0) * P)) + EPOCH
     ]
 
-    rv_err = np.random.uniform(0.2, 0.3, size=ts[0].size) * u.km/u.s
+    rv_err = np.random.uniform(0.2, 0.3, size=ts[0].size) * kms
 
     _rnd = np.random.normal(size=ts[0].size)
 
@@ -50,13 +55,13 @@ def main():
     for t in ts:
         rvs.append(orbit.generate_rv_curve(t) + _rnd*rv_err)
 
-    with h5py.File(os.path.join(paths.root, "data", "experiment5.h5"), "w") as f:
+    with h5py.File(os.path.join(cache_path, "experiment5.h5"), "w") as f:
         _data = RVData(t=ts[0], rv=rvs[0], stddev=rv_err)
         data0 = _data[:-2]
 
         g = f.create_group("0")
         data0.to_hdf5(g)
-        g.create_dataset('truth_vector', data=opars.pack())
+        # g.create_dataset('truth_vector', data=opars.pack())
 
         for i,t,rv in zip(range(len(ts)), ts, rvs):
             data = RVData(t=t, rv=rv, stddev=rv_err)
@@ -64,7 +69,8 @@ def main():
             data.to_hdf5(g)
 
         g = f.create_group('truth')
-        opars.to_hdf5(g)
+        for k in opars:
+            quantity_to_hdf5(g, k, opars[k])
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
