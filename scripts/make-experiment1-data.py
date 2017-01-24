@@ -51,7 +51,8 @@ def main():
 
     data = RVData(t=bmjd, rv=rv, stddev=rv_err)
     with h5py.File(os.path.join(cache_path, "experiment1.h5"), "w") as f:
-        data.to_hdf5(f)
+        g = f.create_group('data')
+        data.to_hdf5(g)
 
         g = f.create_group('truth')
         for k in opars:

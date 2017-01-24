@@ -45,7 +45,9 @@ def main():
     rv_err = np.random.uniform(100, 200, size=n_obs) * u.m/u.s # apogee-like
     rv = np.random.normal(rv.to(kms).value, rv_err.to(kms).value) * kms
 
-    with h5py.File(os.path.join(cache_path, "experiment2.h5"), "w") as f:
+    with h5py.File(os.path.join(cache_path, "experiment2.h5"), "w") as root:
+        f = root.create_group('data')
+
         data1 = RVData(t=bmjd, rv=rv, stddev=rv_err)
         g = f.create_group('a')
         data1.to_hdf5(g)
@@ -54,7 +56,7 @@ def main():
         g = f.create_group('b')
         data2.to_hdf5(g)
 
-        g = f.create_group('truth')
+        g = root.create_group('truth')
         for k in opars:
             quantity_to_hdf5(g, k, opars[k])
 
