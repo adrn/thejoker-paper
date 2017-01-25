@@ -44,7 +44,9 @@ def main():
     rv_err = np.random.uniform(100, 200, size=n_obses.max()) * u.m/u.s # apogee-like
     rv = np.random.normal(rv.to(kms).value, rv_err.to(kms).value) * kms
 
-    with h5py.File(os.path.join(cache_path, "experiment3.h5"), "w") as f:
+    with h5py.File(os.path.join(cache_path, "experiment3.h5"), "w") as root:
+        f = root.create_group('data')
+
         for n_obs in n_obses:
             if len(bmjd) > n_obs:
                 # pick random data points to delete
@@ -57,7 +59,7 @@ def main():
             g = f.create_group(str(n_obs))
             data.to_hdf5(g)
 
-        g = f.create_group('truth')
+        g = root.create_group('truth')
         for k in opars:
             quantity_to_hdf5(g, k, opars[k])
 

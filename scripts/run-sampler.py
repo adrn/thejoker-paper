@@ -7,57 +7,78 @@ from astropy import log as logger
 import astropy.units as u
 import h5py
 import numpy as np
-import six
 from schwimmbad import choose_pool
 
 # Project
-from thejoker import Paths
-paths = Paths()
+from thejoker.sampler import JokerParams, TheJoker, save_prior_samples
 from thejoker.data import RVData
-from thejoker.units import default_units
-# from thejoker.pool import choose_pool
-from thejoker.celestialmechanics import OrbitalParams
-from thejoker.sampler import get_good_samples, samples_to_orbital_params, sample_prior
-from thejoker import config
 
-def main(data_file, pool, tmp_prior_filename, n_samples=1, seed=42, hdf5_key=None,
-         cache_filename=None, overwrite=False, continue_sampling=False,
-         hyperpars_strs=dict(), log_jitter2_mean=0., log_jitter2_std=3.):
+if not os.path.exists(os.path.abspath("../scripts")):
+    raise RuntimeError("Script must be run from within the scripts directory.")
 
-    full_path = os.path.abspath(data_file)
-    if cache_filename is None:
-        if hdf5_key is None:
-            basename = os.path.basename(full_path)
-            name = os.path.splitext(basename)[0]
-            output_filename = os.path.join(paths.root, "cache", "{}.h5".format(name))
-        else:
-            output_filename = os.path.join(paths.root, "cache", "{}.h5".format(hdf5_key))
+def main(filename, pool, prior_samples_file, n_samples=1, seed=42, hdf5_key=None,
+         overwrite=False, continue_sampling=False, tmp_prior=False,
+         P_min=None, P_max=None, fixed_jitter=None,
+         log_jitter2_mean=None, log_jitter2_std=None, jitter_unit=None):
+
+    filename = os.path.abspath(filename)
+    prior_samples_file = os.path.abspath(prior_samples_file)
+
+    if not os.path.exists(filename):
+        raise IOError("Data / cache file '{}' does not exist!".format(filename))
+
+    # Configuration / hyper-parameters
+    config = dict()
+
+    if P_min is None:
+        config['P_min'] = 8. * u.day
+    else:
+        config['P_min'] = float(P_min) * u.day
+
+    if P_max is None:
+        config['P_max'] = 8192. * u.day
+    else:
+        config['P_max'] = float(P_max) * u.day
+
+    joker_pars_kw = dict()
+    if fixed_jitter is None and log_jitter2_mean is None:
+        joker_pars_kw['jitter'] = 0. * u.m/u.s
+
+    elif fixed_jitter is None and log_jitter2_mean is not None:
+        assert log_jitter2_std is not None
+        assert jitter_unit is not None
+
+        joker_pars_kw['jitter'] = (log_jitter2_mean, log_jitter2_std)
+        joker_pars_kw['jitter_unit'] = u.Unit(str(jitter_unit))
 
     else:
-        output_filename = "{}.h5".format(os.path.splitext(cache_filename)[0])
-        _path,_basename = os.path.split(output_filename)
-        if not _path:
-            output_filename = os.path.join(paths.root, "cache", output_filename)
+        joker_pars_kw['jitter'] = config['jitter']
 
-    # container for hyper-parameter values
-    hyperpars = dict(fixed_jitter=None, P_min=None, P_max=None)
+    rerun = 0
+    with h5py.File(filename, 'r+') as f:
+        # get paths within HDF5 file
+        if hdf5_key is not None:
+            samples_path = 'samples/{}'.format(hdf5_key)
+            data_path = 'data/{}'.format(hdf5_key)
 
-    # see if we already did this:
-    if os.path.exists(output_filename):
-        if not overwrite and not continue_sampling:
-            logger.info("Sampling already performed. Use --overwrite to redo or --continue "
-                        "to keep sampling.")
-            pool.close()
-            sys.exit(0)
+        else:
+            samples_path = 'samples'
+            data_path = 'data'
 
-        elif continue_sampling: # we need to increment the random number seed appropriately
-            mode = 'a' # append to output file
+        if samples_path in f:
+            if not overwrite and not continue_sampling:
+                logger.info("Sampling already performed for '{}':/data/{}. Use --overwrite "
+                            "to redo or --continue to keep sampling.".format(filename, hdf5_key))
+                pool.close()
+                sys.exit(0)
 
-            with h5py.File(output_filename, 'r') as f:
-                if 'rerun' not in f.attrs:
+            elif continue_sampling: # we need to increment the random number seed appropriately
+                mode = 'a' # append to output file
+
+                if 'rerun' not in f[samples_path].attrs:
                     rerun = 0
                 else:
-                    rerun = f.attrs['rerun'] + 1
+                    rerun = f[samples_path].attrs['rerun'] + 1
 
                 if rerun != 0:
                     logger.debug("Reading hyperparameters from cache file.")
@@ -65,35 +86,17 @@ def main(data_file, pool, tmp_prior_filename, n_samples=1, seed=42, hdf5_key=Non
                     # HACK: this should be better
                     for name,unit in zip(['fixed_jitter', 'P_min', 'P_max'],
                                          [u.m/u.s, u.day, u.day]):
-                        if np.isnan(f.attrs[name]):
-                            hyperpars[name] = None
+                        if np.isnan(f[samples_path].attrs[name]):
+                            config[name] = None
                         else:
-                            hyperpars[name] = f.attrs[name] * unit
+                            config[name] = f.attrs[name] * unit
 
-        elif overwrite: # restart rerun counter
-            rerun = 0
-            mode = 'w'
+            elif overwrite: # restart rerun counter
+                rerun = 0
+                del f[samples_path]
 
-        else:
-            raise ValueError("Unknown state!")
-
-    else:
-        mode = 'w'
-        rerun = 0
-
-    # get defaults for hyper-parameters:
-    for name in hyperpars.keys():
-        if hyperpars[name] is None:
-            if hyperpars_strs[name] is None:
-                hyperpars[name] = config.defaults[name]
             else:
-                if isinstance(hyperpars_strs[name], six.string_types):
-                    val,unit = str(hyperpars_strs[name]).split()
-                    hyperpars[name] = float(val) * u.Unit(unit)
-                else:
-                    hyperpars[name] = float(hyperpars_strs[name])
-
-        logger.debug("{}: {}".format(name, hyperpars[name]))
+                raise ValueError("Unknown state!")
 
     # do this after choosing pool so all processes don't have same seed
     if seed is not None:
@@ -101,50 +104,40 @@ def main(data_file, pool, tmp_prior_filename, n_samples=1, seed=42, hdf5_key=Non
             logger.info("This is rerun {} -- incrementing random number seed.".format(rerun))
 
         logger.debug("random number seed: {} (+ rerun: {})".format(seed, rerun))
-        seed = int(str(seed) + str(rerun))
-        np.random.seed(seed)
+        seed = int(str(seed) + str(rerun)) # why do i do this dumb thing?
+        rnd = np.random.RandomState(seed=seed)
 
-    # only accepts HDF5 data formats with units
-    logger.debug("Reading data from input file at '{}'".format(full_path))
-    with h5py.File(full_path, 'r') as f:
-        if hdf5_key is not None:
-            data = RVData.from_hdf5(f[hdf5_key])
-        else:
-            data = RVData.from_hdf5(f)
+    else:
+        rnd = np.random.RandomState()
 
+    # create TheJoker sampler instance
+    params = JokerParams(P_min=config['P_min'], P_max=config['P_max'], anomaly_tol=1E-11,
+                         **joker_pars_kw)
+    joker = TheJoker(params, random_state=rnd, pool=pool)
+
+    logger.debug("Reading data from input file at '{}'".format(filename))
+    with h5py.File(filename, 'r') as f:
+        data = RVData.from_hdf5(f[data_path])
+
+    # create prior samples cache, store to file and store filename in DB
     logger.debug("Number of prior samples: {}".format(n_samples))
-    prior_samples = sample_prior(n_samples, P_min=hyperpars['P_min'], P_max=hyperpars['P_max'],
-                                 log_jitter2_mean=log_jitter2_mean, log_jitter2_std=log_jitter2_std)
-    P = prior_samples['P'].to(default_units['P']).value
-    ecc = prior_samples['ecc']
-    phi0 = prior_samples['phi0'].to(default_units['phi0']).value
-    omega = prior_samples['omega'].to(default_units['omega']).value
-    jitter2 = prior_samples['jitter2'].to(default_units['jitter']**2).value
+    if not os.path.exists(prior_samples_file) or tmp_prior:
+        logger.debug("Generating prior samples now, caching to '{}'...".format(prior_samples_file))
 
-    # if fixing jitter, set all values of jitter samples to the fixed value
-    if hyperpars['fixed_jitter'] is not None:
-        jitter2 = np.ones_like(jitter2) * hyperpars['fixed_jitter'].to(default_units['jitter']).value**2
+        prior_samples = joker.sample_prior(n_samples)
+        prior_units = save_prior_samples(prior_samples_file, prior_samples, u.km/u.s) # data is in km/s
+        del prior_samples
 
-    # pack the nonlinear parameters into an array
-    nonlinear_p = np.vstack((P, phi0, ecc, omega, jitter2)).T
-    # Note: the linear parameters are (v0, K)
+        logger.debug("...done")
 
-    # cache the prior samples
-    with h5py.File(tmp_prior_filename, "w") as f:
-        f.create_dataset('samples', data=nonlinear_p)
+    else:
+        with h5py.File(prior_samples_file, 'r') as f:
+            prior_units = [u.Unit(uu) for uu in f.attrs['units']]
 
     logger.debug("Running sampler...")
+    samples = joker.rejection_sample(data, prior_cache_file=prior_samples_file)
 
-    good_samples_idx = get_good_samples(n_samples, tmp_prior_filename, data, pool)
-    nl_samples = nonlinear_p[good_samples_idx]
-    if len(nl_samples) == 0:
-        logger.error("Failed to find any good samples!")
-        pool.close()
-        sys.exit(0)
-
-    # compute orbital parameters for all good samples
-    orbital_params = samples_to_orbital_params(good_samples_idx, tmp_prior_filename,
-                                               data, pool, seed)
+    return
 
     # save the orbital parameters out to a cache file
     with h5py.File(output_filename, mode) as f:
@@ -188,7 +181,7 @@ if __name__ == "__main__":
     oc_group = parser.add_mutually_exclusive_group()
     oc_group.add_argument("-o", "--overwrite", dest="overwrite", default=False,
                           action="store_true", help="Overwrite any existing data.")
-    oc_group.add_argument("-c", "--continue", dest="_continue", default=False,
+    oc_group.add_argument("-c", "--continue", dest="continue_", default=False,
                           action="store_true", help="Continue the sampler.")
 
     parser.add_argument("-s", "--seed", dest="seed", default=None, type=int,
@@ -200,30 +193,28 @@ if __name__ == "__main__":
     group.add_argument("--mpi", dest="mpi", default=False,
                        action="store_true", help="Run with MPI.")
 
-    parser.add_argument("-f", "--file", dest="data_file", default=None, required=True,
+    parser.add_argument("-f", "--filename", dest="filename", default=None, required=True,
                         type=str, help="Path to HDF5 data file to analyze.")
+    parser.add_argument("--prior-filename", dest="prior_filename", default=None,
+                        type=str, help="Path to (store or load) prior samples.")
     parser.add_argument("--hdf5-key", dest="hdf5_key", default=None,
                         type=str, help="Path within an HDF5 file to the data.")
-    parser.add_argument("--name", dest="cache_name", default=None,
-                        type=str, help="Name to use when saving the cache file.")
     parser.add_argument("-n", "--num-samples", dest="n_samples", default=2**20,
-                        type=str, help="Number of prior samples.")
+                        type=str, help="Number of prior samples to use in rejection sampling.")
 
     parser.add_argument("--fixed-jitter", dest="fixed_jitter", default=None, type=str,
                         help="Extra uncertainty to add in quadtrature to the RV measurement "
                              "uncertainties. Must specify a number with units, e.g., '15 m/s'")
-    parser.add_argument("--Pmin", dest="P_min", default=None, type=str,
-                        help="Minimum period to generate samples to (default: {})."
-                             "Must specify a number with units, e.g., '2 day'"
-                             .format(config.defaults['P_min']))
-    parser.add_argument("--Pmax", dest="P_max", default=None, type=str,
-                        help="Maximum period to generate samples to (default: {})."
-                             "Must specify a number with units, e.g., '8192 day'"
-                             .format(config.defaults['P_max']))
+    parser.add_argument("--Pmin", dest="P_min", default=8., type=float,
+                        help="Minimum period for period prior in days.")
+    parser.add_argument("--Pmax", dest="P_max", default=8192, type=float,
+                        help="Maximum period for perior prior in days.")
 
-    parser.add_argument("--log-jitter2-mean", dest="log_jitter2_mean", default=0.,
+    parser.add_argument("--log-jitter2-mean", dest="log_jitter2_mean", default=None, type=float,
                         help="TODO")
-    parser.add_argument("--log-jitter2-std", dest="log_jitter2_std", default=3.,
+    parser.add_argument("--log-jitter2-std", dest="log_jitter2_std", default=None, type=float,
+                        help="TODO")
+    parser.add_argument("--jitter-unit", dest="jitter_unit", default=None, type=str,
                         help="TODO")
 
     args = parser.parse_args()
@@ -252,10 +243,19 @@ if __name__ == "__main__":
     pool_kwargs = dict(mpi=args.mpi, processes=args.n_procs)
     pool = choose_pool(**pool_kwargs)
 
-    # use a context manager so the prior samples file always gets deleted
-    with tempfile.NamedTemporaryFile(dir=os.path.join(paths.root, "cache")) as fp:
-        main(data_file=args.data_file, pool=pool, n_samples=n_samples, hdf5_key=args.hdf5_key,
-             seed=args.seed, overwrite=args.overwrite, continue_sampling=args._continue,
-             cache_filename=args.cache_name, tmp_prior_filename=fp.name,
-             hyperpars_strs=dict(fixed_jitter=args.fixed_jitter, P_min=args.P_min, P_max=args.P_max),
-             log_jitter2_mean=args.log_jitter2_mean, log_jitter2_std=args.log_jitter2_std)
+    if args.prior_filename is None:
+        with tempfile.NamedTemporaryFile(dir=os.path.abspath("../cache")) as fp:
+            main(filename=args.filename, pool=pool, n_samples=n_samples, hdf5_key=args.hdf5_key,
+                 prior_samples_file=fp.name, tmp_prior=True,
+                 seed=args.seed, overwrite=args.overwrite, continue_sampling=args.continue_,
+                 P_min=args.P_min, P_max=args.P_max, fixed_jitter=args.fixed_jitter,
+                 log_jitter2_mean=args.log_jitter2_mean, log_jitter2_std=args.log_jitter2_std,
+                 jitter_unit=args.jitter_unit)
+
+    else:
+        main(filename=args.filename, pool=pool, n_samples=n_samples, hdf5_key=args.hdf5_key,
+             prior_samples_file=args.prior_filename,
+             seed=args.seed, overwrite=args.overwrite, continue_sampling=args.continue_,
+             P_min=args.P_min, P_max=args.P_max, fixed_jitter=args.fixed_jitter,
+             log_jitter2_mean=args.log_jitter2_mean, log_jitter2_std=args.log_jitter2_std,
+             jitter_unit=args.jitter_unit)

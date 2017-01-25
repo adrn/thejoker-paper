@@ -55,7 +55,9 @@ def main():
     for t in ts:
         rvs.append(orbit.generate_rv_curve(t) + _rnd*rv_err)
 
-    with h5py.File(os.path.join(cache_path, "experiment5.h5"), "w") as f:
+    with h5py.File(os.path.join(cache_path, "experiment5.h5"), "w") as root:
+        f = root.create_group('data')
+
         _data = RVData(t=ts[0], rv=rvs[0], stddev=rv_err)
         data0 = _data[:-2]
 
@@ -68,7 +70,7 @@ def main():
             g = f.create_group(str(i+1))
             data.to_hdf5(g)
 
-        g = f.create_group('truth')
+        g = root.create_group('truth')
         for k in opars:
             quantity_to_hdf5(g, k, opars[k])
 
