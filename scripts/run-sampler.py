@@ -53,7 +53,8 @@ def main(filename, pool, prior_samples_file, n_samples=1, seed=42, hdf5_key=None
         joker_pars_kw['jitter_unit'] = u.Unit(str(jitter_unit))
 
     else:
-        joker_pars_kw['jitter'] = config['jitter']
+        val,unit = fixed_jitter.split()
+        joker_pars_kw['jitter'] = float(val) * u.Unit(unit)
 
     rerun = 0
     with h5py.File(filename, 'r+') as f:
