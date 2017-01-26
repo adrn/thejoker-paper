@@ -12,6 +12,7 @@ from schwimmbad import choose_pool
 # Project
 from thejoker.sampler import JokerParams, TheJoker, save_prior_samples
 from thejoker.data import RVData
+from thejoker.utils import quantity_to_hdf5, quantity_from_hdf5
 
 if not os.path.exists(os.path.abspath("../scripts")):
     raise RuntimeError("Script must be run from within the scripts directory.")
@@ -73,23 +74,10 @@ def main(filename, pool, prior_samples_file, n_samples=1, seed=42, hdf5_key=None
                 sys.exit(0)
 
             elif continue_sampling: # we need to increment the random number seed appropriately
-                mode = 'a' # append to output file
-
                 if 'rerun' not in f[samples_path].attrs:
                     rerun = 0
                 else:
                     rerun = f[samples_path].attrs['rerun'] + 1
-
-                if rerun != 0:
-                    logger.debug("Reading hyperparameters from cache file.")
-
-                    # HACK: this should be better
-                    for name,unit in zip(['fixed_jitter', 'P_min', 'P_max'],
-                                         [u.m/u.s, u.day, u.day]):
-                        if np.isnan(f[samples_path].attrs[name]):
-                            config[name] = None
-                        else:
-                            config[name] = f.attrs[name] * unit
 
             elif overwrite: # restart rerun counter
                 rerun = 0
@@ -125,44 +113,36 @@ def main(filename, pool, prior_samples_file, n_samples=1, seed=42, hdf5_key=None
         logger.debug("Generating prior samples now, caching to '{}'...".format(prior_samples_file))
 
         prior_samples = joker.sample_prior(n_samples)
-        prior_units = save_prior_samples(prior_samples_file, prior_samples, u.km/u.s) # data is in km/s
+        save_prior_samples(prior_samples_file, prior_samples, u.km/u.s) # data is in km/s
         del prior_samples
 
         logger.debug("...done")
 
-    else:
-        with h5py.File(prior_samples_file, 'r') as f:
-            prior_units = [u.Unit(uu) for uu in f.attrs['units']]
-
     logger.debug("Running sampler...")
     samples = joker.rejection_sample(data, prior_cache_file=prior_samples_file)
 
-    return
-
     # save the orbital parameters out to a cache file
-    with h5py.File(output_filename, mode) as f:
-        f.attrs['rerun'] = rerun
-        if hyperpars['fixed_jitter'] is not None:
-            f.attrs['fixed_jitter'] = hyperpars['fixed_jitter']
-        else:
-            f.attrs['fixed_jitter'] = np.nan
-        f.attrs['P_min'] = hyperpars['P_min']
-        f.attrs['P_max'] = hyperpars['P_max']
+    with h5py.File(filename, 'a') as root:
+        if samples_path not in root:
+            root.create_group(samples_path)
 
-        for i,(name,unit) in enumerate(OrbitalParams._name_to_unit.items()):
-            if name in f:
+        f = root[samples_path]
+        f.attrs['rerun'] = rerun
+
+        for key,val in samples.items():
+            if key in f:
                 if overwrite: # delete old samples and overwrite
-                    del f[name]
-                    f.create_dataset(name, data=orbital_params.T[i])
+                    del f[key]
+                    quantity_to_hdf5(f, key, val)
 
                 elif continue_sampling: # append to existing samples
-                    _data = f[name][:]
-                    del f[name]
-                    f[name] = np.concatenate((_data, orbital_params.T[i]))
-            else:
-                f.create_dataset(name, data=orbital_params.T[i])
+                    _data = quantity_from_hdf5(f, key)
+                    del f[key]
+                    _data = np.concatenate((_data.to(val.unit).value, val.value))
+                    quantity_to_hdf5(f, key, _data * val.unit)
 
-            f[name].attrs['unit'] = str(unit)
+            else:
+                quantity_to_hdf5(f, key, val)
 
     pool.close()
 
