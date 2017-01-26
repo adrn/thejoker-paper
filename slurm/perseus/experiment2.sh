@@ -36,4 +36,4 @@ srun python run-sampler.py -v --mpi -o \
 -f ../data/experiment2.h5 \
 --name="experiment2-sample-jitter-b.h5" \
 --hdf5-key="b" \
---log-jitter2-mean=10.5 --log-jitter2-std=0.5
+--log-jitter2-mean=10.5 --log-jitter2-std=0.5 --jitter-unit='m/s'
