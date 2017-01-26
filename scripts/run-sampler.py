@@ -17,7 +17,8 @@ from thejoker.utils import quantity_to_hdf5, quantity_from_hdf5
 if not os.path.exists(os.path.abspath("../scripts")):
     raise RuntimeError("Script must be run from within the scripts directory.")
 
-def main(filename, pool, prior_samples_file, n_samples=1, seed=42, hdf5_key=None,
+def main(filename, pool, prior_samples_file, n_samples=1, seed=42,
+         read_key=None, save_key=None,
          overwrite=False, continue_sampling=False, tmp_prior=False,
          P_min=None, P_max=None, fixed_jitter=None,
          log_jitter2_mean=None, log_jitter2_std=None, jitter_unit=None):
@@ -56,21 +57,25 @@ def main(filename, pool, prior_samples_file, n_samples=1, seed=42, hdf5_key=None
         val,unit = fixed_jitter.split()
         joker_pars_kw['jitter'] = float(val) * u.Unit(unit)
 
+    # paths within HDF5 file
+    if read_key is not None:
+        data_path = 'data/{}'.format(read_key)
+    else:
+        data_path = 'data'
+
+    if save_key is not None:
+        samples_path = 'samples/{}'.format(save_key)
+    else:
+        samples_path = 'samples'
+
     rerun = 0
     with h5py.File(filename, 'r+') as f:
-        # get paths within HDF5 file
-        if hdf5_key is not None:
-            samples_path = 'samples/{}'.format(hdf5_key)
-            data_path = 'data/{}'.format(hdf5_key)
-
-        else:
-            samples_path = 'samples'
-            data_path = 'data'
-
         if samples_path in f:
             if not overwrite and not continue_sampling:
-                logger.info("Sampling already performed for '{}':/data/{}. Use --overwrite "
-                            "to redo or --continue to keep sampling.".format(filename, hdf5_key))
+                logger.info("Sampling already performed for {}:{} (saved in {}). Use --overwrite "
+                            "to redo or --continue to keep sampling.".format(filename,
+                                                                             data_path,
+                                                                             samples_path))
                 pool.close()
                 sys.exit(0)
 
@@ -178,10 +183,13 @@ if __name__ == "__main__":
                         type=str, help="Path to HDF5 data file to analyze.")
     parser.add_argument("--prior-filename", dest="prior_filename", default=None,
                         type=str, help="Path to (store or load) prior samples.")
-    parser.add_argument("--hdf5-key", dest="hdf5_key", default=None,
-                        type=str, help="Path within an HDF5 file to the data.")
     parser.add_argument("-n", "--num-samples", dest="n_samples", default=2**20,
                         type=str, help="Number of prior samples to use in rejection sampling.")
+
+    parser.add_argument("--read-key", dest="read_key", default=None,
+                        type=str, help="Path within HDF5 file to read the data.")
+    parser.add_argument("--save-key", dest="save_key", default=None,
+                        type=str, help="Path within HDF5 file to save the samples.")
 
     parser.add_argument("--fixed-jitter", dest="fixed_jitter", default=None, type=str,
                         help="Extra uncertainty to add in quadtrature to the RV measurement "
@@ -226,7 +234,8 @@ if __name__ == "__main__":
 
     if args.prior_filename is None:
         with tempfile.NamedTemporaryFile(dir=os.path.abspath("../cache")) as fp:
-            main(filename=args.filename, pool=pool, n_samples=n_samples, hdf5_key=args.hdf5_key,
+            main(filename=args.filename, pool=pool, n_samples=n_samples,
+                 read_key=args.read_key, save_key=args.save_key,
                  prior_samples_file=fp.name, tmp_prior=True,
                  seed=args.seed, overwrite=args.overwrite, continue_sampling=args.continue_,
                  P_min=args.P_min, P_max=args.P_max, fixed_jitter=args.fixed_jitter,
@@ -234,7 +243,8 @@ if __name__ == "__main__":
                  jitter_unit=args.jitter_unit)
 
     else:
-        main(filename=args.filename, pool=pool, n_samples=n_samples, hdf5_key=args.hdf5_key,
+        main(filename=args.filename, pool=pool, n_samples=n_samples,
+             read_key=args.read_key, save_key=args.save_key,
              prior_samples_file=args.prior_filename,
              seed=args.seed, overwrite=args.overwrite, continue_sampling=args.continue_,
              P_min=args.P_min, P_max=args.P_max, fixed_jitter=args.fixed_jitter,
