@@ -8,23 +8,21 @@
 #SBATCH --mail-type=begin       # email me when the job starts
 #SBATCH --mail-type=end         # email me when the job finishes
 
-cd /tigress/adrianp/projects/thejoker/scripts/
+cd /tigress/adrianp/projects/thejoker-paper/scripts/
 
 module load openmpi/gcc/1.10.2/64
 
-source activate thejoker
+source activate thejoker-paper
 
 # Run experiment 4!
 srun python run-sampler.py -v --mpi -o \
 -n 2**28 -s 42 \
--f ../data/troup-allVisit.h5 \
---hdf5-key="2M00110648+6609349" \
---name="experiment4-fixed-jitter.h5" \
+-f ../cache/experiment4.h5 \
+--save-key='fixed-jitter' \
 --fixed-jitter='0 m/s'
 
 srun python run-sampler.py -v --mpi -o \
 -n 2**28 -s 42 \
--f ../data/troup-allVisit.h5 \
---hdf5-key="2M00110648+6609349" \
---name="experiment4-sample-jitter.h5" \
---log-jitter2-mean=10.5 --log-jitter2-std=1.
+-f ../cache/experiment4.h5 \
+--save-key='sample-jitter' \
+--log-jitter2-mean=10.5 --log-jitter2-std=1. --jitter-unit='m/s'

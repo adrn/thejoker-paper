@@ -8,11 +8,11 @@
 #SBATCH --mail-type=begin       # email me when the job starts
 #SBATCH --mail-type=end         # email me when the job finishes
 
-cd /tigress/adrianp/projects/thejoker/scripts/
+cd /tigress/adrianp/projects/thejoker-paper/scripts/
 
 module load openmpi/gcc/1.10.2/64
 
-source activate thejoker
+source activate thejoker-paper
 
 # Run experiment 5!
 python make-experiment5-data.py -s 42
@@ -23,28 +23,24 @@ export SEED=42
 # Run experiment 5, moving data point index=1 through 1 period in 8 steps:
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
--f ../data/experiment5.h5 \
---name="experiment5-0.hdf5" \
---hdf5-key="0" \
+-f ../cache/experiment5.h5 \
+--read-key='0' --save-key='0' \
 --seed=$SEED
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
--f ../data/experiment5.h5 \
---name="experiment5-1.hdf5" \
---hdf5-key="1" \
+-f ../cache/experiment5.h5 \
+--read-key='1' --save-key='1' \
 --seed=$SEED
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
--f ../data/experiment5.h5 \
---name="experiment5-2.hdf5" \
---hdf5-key="2" \
+-f ../cache/experiment5.h5 \
+--read-key='2' --save-key='2' \
 --seed=$SEED
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
--f ../data/experiment5.h5 \
---name="experiment5-3.hdf5" \
---hdf5-key="3" \
+-f ../cache/experiment5.h5 \
+--read-key='3' --save-key='3' \
 --seed=$SEED

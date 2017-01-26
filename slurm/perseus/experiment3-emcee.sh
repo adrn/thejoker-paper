@@ -8,11 +8,11 @@
 #SBATCH --mail-type=begin       # email me when the job starts
 #SBATCH --mail-type=end         # email me when the job finishes
 
-cd /tigress/adrianp/projects/thejoker/scripts/
+cd /tigress/adrianp/projects/thejoker-paper/scripts/
 
 module load openmpi/gcc/1.10.2/64
 
-source activate thejoker
+source activate thejoker-paper
 
 export NSTEPS=16384
 export SEED=42
@@ -20,14 +20,14 @@ export SEED=42
 # Run emcee on output from experiment 3
 srun python continue-with-emcee.py -v --mpi -o \
 --nsteps=$NSTEPS \
--f ../data/experiment3.h5 \
---hdf5-key="11" \
---name="experiment3-11.hdf5" \
+-f ../cache/experiment3.h5 \
+--read-key="11" \
+--save-key="11" \
 --seed=$SEED
 
 srun python continue-with-emcee.py -v --mpi -o \
 --nsteps=$NSTEPS \
--f ../data/experiment3.h5 \
---hdf5-key="9" \
---name="experiment3-9.hdf5" \
+-f ../cache/experiment3.h5 \
+--read-key="9" \
+--save-key="9" \
 --seed=$SEED

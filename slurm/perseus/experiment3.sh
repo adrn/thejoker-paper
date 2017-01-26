@@ -8,11 +8,11 @@
 #SBATCH --mail-type=begin       # email me when the job starts
 #SBATCH --mail-type=end         # email me when the job finishes
 
-cd /tigress/adrianp/projects/thejoker/scripts/
+cd /tigress/adrianp/projects/thejoker-paper/scripts/
 
 module load openmpi/gcc/1.10.2/64
 
-source activate thejoker
+source activate thejoker-paper
 
 python make-experiment3-data.py -s 42
 
@@ -21,40 +21,40 @@ export SEED=42
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
--f ../data/experiment3.h5 \
---name="experiment3-11.hdf5" \
---hdf5-key="11" \
+-f ../cache/experiment3.h5 \
+--read-key="11" \
+--save-key="11" \
 --seed=$SEED \
 --fixed-jitter='0 m/s'
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
--f ../data/experiment3.h5 \
---name="experiment3-9.hdf5" \
---hdf5-key="9" \
+-f ../cache/experiment3.h5 \
+--read-key="9" \
+--save-key="9" \
 --seed=$SEED \
 --fixed-jitter='0 m/s'
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
--f ../data/experiment3.h5 \
---name="experiment3-7.hdf5" \
---hdf5-key="7" \
+-f ../cache/experiment3.h5 \
+--read-key="7" \
+--save-key="7" \
 --seed=$SEED \
 --fixed-jitter='0 m/s'
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
--f ../data/experiment3.h5 \
---name="experiment3-5.hdf5" \
---hdf5-key="5" \
+-f ../cache/experiment3.h5 \
+--read-key="5" \
+--save-key="5" \
 --seed=$SEED \
 --fixed-jitter='0 m/s'
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
--f ../data/experiment3.h5 \
---name="experiment3-3.hdf5" \
---hdf5-key="3" \
+-f ../cache/experiment3.h5 \
+--read-key="3" \
+--save-key="3" \
 --seed=$SEED \
 --fixed-jitter='0 m/s'
