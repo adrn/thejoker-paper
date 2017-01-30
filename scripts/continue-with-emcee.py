@@ -13,6 +13,7 @@ import sys
 import astropy.units as u
 import emcee
 import h5py
+import matplotlib.pyplot as plt
 import numpy as np
 from schwimmbad import choose_pool
 
@@ -108,20 +109,77 @@ def main(filename, pool, n_steps, overwrite=False, seed=42,
         logger.debug("Only one surviving sample.")
 
     # transform samples to the parameters we'll sample using emcee
-    _names = 'P', 'phi0', 'ecc', 'omega', 'jitter', 'K', 'v0'
-    samples_vec = np.array([samples[k].value for k in _names]).T
-    samples_trans = mcmc.to_mcmc_params(samples_vec.T).T
 
-    # TODO HACK: to remove jitter, because it's fixed
-    samples_trans = np.delete(samples_trans, 5, axis=1)
+    # HACK!!! read true values
+    with h5py.File(filename, 'r') as f:
+        samples = dict()
+        for k in f['truth']:
+            samples[k] = quantity_from_hdf5(f['truth'], k).reshape(1)
 
-    j_max = np.argmax([mcmc.ln_posterior(s, params, data) for s in samples_trans])
-    p0 = samples_trans[j_max]
+    dphi = (2*np.pi*data.t_offset*u.day/samples['P']).to(u.radian, u.dimensionless_angles()) % (2*np.pi*u.radian)
+    samples['phi0'] = samples['phi0'] - dphi
 
-    # HACK: config
-    M_min = 128
-    n_walkers = M_min
-    p0 = emcee.utils.sample_ball(p0, 1E-5*np.abs(p0), size=n_walkers)
+    # TESTING
+    # from thejoker.celestialmechanics import SimulatedRVOrbit
+    # orbit = SimulatedRVOrbit(**samples)
+    # t_grid = np.linspace(data.t.tcb.mjd.min()-16, data.t.tcb.mjd.max()+16, 1024)
+    # rv = orbit.generate_rv_curve(t_grid)
+    # plt.plot(t_grid, rv, marker='', linestyle='-')
+    # plt.plot(data.t.tcb.mjd, data.rv.value, marker='o', linestyle='none')
+    # plt.show()
+    # return
+
+    # samples_mcmc = mcmc.pack_samples_mcmc(samples, params, data)
+    # # mcmc.ln_posterior(samples_mcmc[0], params, data)
+
+    # mcmc_p = samples_mcmc[0]
+
+    # vals = np.linspace(0.95, 1.05, 5) * mcmc_p[0]
+    # probs = np.zeros_like(vals)
+    # for i,val in enumerate(vals):
+    #     _p = mcmc_p.copy()
+    #     _p[0] = val
+    #     probs[i] = mcmc.ln_posterior(_p, params, data)
+
+    # plt.plot(vals, probs)
+    # plt.axvline(mcmc_p[0], color='r')
+    # plt.legend()
+    # plt.show()
+
+    # return
+
+    # samples_mcmc = mcmc.pack_samples_mcmc(samples, params, data)
+    # names = ['lnP', 'sqrt(K)cos(phi0)', 'sqrt(K)sin(phi0)',
+    #          'sqrt(e)cos(omega)', 'sqrt(e)sin(omega)', 'v0']
+    # mcmc_p = samples_mcmc[0]
+
+    # samples_vec = mcmc.pack_samples(samples, params, data)
+    # names = ['P', 'phi0', 'ecc', 'omega', 'jitter', 'K', 'v0']
+    # p = samples_vec[0]
+    # for idx in range(7):
+    #     print(idx, names[idx])
+    #     plt.figure()
+    #     vals = np.linspace(0.9, 1.1, 128) * p[idx]
+    #     probs = np.zeros_like(vals)
+    #     for i,val in enumerate(vals):
+    #         _p = p.copy()
+    #         _p[idx] = val
+    #         probs[i] = mcmc.ln_likelihood(_p, params, data).sum()
+    #     plt.plot(vals, probs)
+    #     plt.axvline(p[idx], color='r', zorder=-100)
+    #     plt.title(names[idx])
+
+    # plt.show()
+    # return
+    ###############################################
+
+    samples_mcmc = mcmc.pack_samples_mcmc(samples, params, data)
+    j_max = np.argmax([mcmc.ln_posterior(s, params, data) for s in samples_mcmc])
+    p0 = samples_mcmc[j_max]
+
+    # HACK: config value
+    n_walkers = 128
+    p0 = emcee.utils.sample_ball(p0, 1E-6*np.abs(p0), size=n_walkers)
 
     sampler = emcee.EnsembleSampler(n_walkers, p0.shape[1],
                                     lnpostfn=mcmc.ln_posterior, args=(params,data),
@@ -131,23 +189,7 @@ def main(filename, pool, n_steps, overwrite=False, seed=42,
 
     pool.close()
 
-    pos = np.hstack((pos, np.zeros((pos.shape[0],1))))
-    emcee_samples_vec = mcmc.from_mcmc_params(pos.T)
-
-    import matplotlib.pyplot as plt
-    # import corner
-    # corner.corner(np.vstack(sampler.chain[:,:-128]))
-
-    nwalkers, nlinks, dim = sampler.chain.shape
-    for k in range(dim):
-        plt.figure()
-        for n in range(nwalkers):
-            plt.plot(sampler.chain[n,:,k], marker='', drawstyle='steps', alpha=0.1)
-
-    plt.show()
-
-    # TODO: turn vec into dict with units
-
+    emcee_samples = mcmc.unpack_samples_mcmc(pos, params, data)
     with h5py.File(filename, 'a') as root:
         f = root[emcee_path]
         for key,val in emcee_samples.items():
