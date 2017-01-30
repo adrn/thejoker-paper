@@ -191,7 +191,7 @@ def main(filename, pool, n_steps, overwrite=False, seed=42,
 
     emcee_samples = mcmc.unpack_samples_mcmc(pos, params, data)
     with h5py.File(filename, 'a') as root:
-        f = root[emcee_path]
+        f = root.create_group(emcee_path)
         for key,val in emcee_samples.items():
             quantity_to_hdf5(f, key, val)
 
@@ -206,12 +206,8 @@ if __name__ == "__main__":
     vq_group.add_argument('-v', '--verbose', action='count', default=0, dest='verbosity')
     vq_group.add_argument('-q', '--quiet', action='count', default=0, dest='quietness')
 
-    oc_group = parser.add_mutually_exclusive_group()
-    oc_group.add_argument("-o", "--overwrite", dest="overwrite", default=False,
-                          action="store_true", help="Overwrite any existing data.")
-    oc_group.add_argument("-c", "--continue", dest="_continue", default=False,
-                          action="store_true", help="Continue the sampler.")
-
+    parser.add_argument("-o", "--overwrite", dest="overwrite", default=False,
+                        action="store_true", help="Overwrite any existing data.")
     parser.add_argument("--seed", dest="seed", default=None, type=int,
                         help="Random number seed")
 
