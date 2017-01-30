@@ -22,39 +22,39 @@ export SEED=42
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
 -f ../cache/experiment3.h5 \
---read-key="11" \
---save-key="11" \
+--data-key="11" \
+--samples-key="11" \
 --seed=$SEED \
 --fixed-jitter='0 m/s'
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
 -f ../cache/experiment3.h5 \
---read-key="9" \
---save-key="9" \
+--data-key="9" \
+--samples-key="9" \
 --seed=$SEED \
 --fixed-jitter='0 m/s'
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
 -f ../cache/experiment3.h5 \
---read-key="7" \
---save-key="7" \
+--data-key="7" \
+--samples-key="7" \
 --seed=$SEED \
 --fixed-jitter='0 m/s'
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
 -f ../cache/experiment3.h5 \
---read-key="5" \
---save-key="5" \
+--data-key="5" \
+--samples-key="5" \
 --seed=$SEED \
 --fixed-jitter='0 m/s'
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
 -f ../cache/experiment3.h5 \
---read-key="3" \
---save-key="3" \
+--data-key="3" \
+--samples-key="3" \
 --seed=$SEED \
 --fixed-jitter='0 m/s'

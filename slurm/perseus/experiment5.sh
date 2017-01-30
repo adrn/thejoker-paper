@@ -24,23 +24,23 @@ export SEED=42
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
 -f ../cache/experiment5.h5 \
---read-key='0' --save-key='0' \
+--data-key='0' --samples-key='0' \
 --seed=$SEED
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
 -f ../cache/experiment5.h5 \
---read-key='1' --save-key='1' \
+--data-key='1' --samples-key='1' \
 --seed=$SEED
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
 -f ../cache/experiment5.h5 \
---read-key='2' --save-key='2' \
+--data-key='2' --samples-key='2' \
 --seed=$SEED
 
 srun python run-sampler.py -v --mpi -o \
 -n $NSAMPLES \
 -f ../cache/experiment5.h5 \
---read-key='3' --save-key='3' \
+--data-key='3' --samples-key='3' \
 --seed=$SEED

@@ -20,20 +20,20 @@ python make-experiment2-data.py -s 123
 srun python run-sampler.py -v --mpi -o \
 -n 2**28 -s 42 \
 -f ../cache/experiment2.h5 \
---save-key='fixed-jitter-a' \
---read-key="a" \
+--samples-key='fixed-jitter-a' \
+--data-key="a" \
 --fixed-jitter='0 m/s'
 
 srun python run-sampler.py -v --mpi -o \
 -n 2**28 -s 42 \
 -f ../cache/experiment2.h5 \
---save-key='fixed-jitter-b' \
---read-key="b" \
+--samples-key='fixed-jitter-b' \
+--data-key="b" \
 --fixed-jitter='0 m/s'
 
 srun python run-sampler.py -v --mpi -o \
 -n 2**28 -s 42 \
 -f ../cache/experiment2.h5 \
---save-key='sample-jitter-b' \
---read-key='b' \
+--samples-key='sample-jitter-b' \
+--data-key='b' \
 --log-jitter2-mean=10.5 --log-jitter2-std=0.5 --jitter-unit='m/s'

@@ -21,13 +21,13 @@ export SEED=42
 srun python continue-with-emcee.py -v --mpi -o \
 --nsteps=$NSTEPS \
 -f ../cache/experiment3.h5 \
---read-key="11" \
---save-key="11" \
+--data-key="11" \
+--samples-key="11" \
 --seed=$SEED
 
 srun python continue-with-emcee.py -v --mpi -o \
 --nsteps=$NSTEPS \
 -f ../cache/experiment3.h5 \
---read-key="9" \
---save-key="9" \
+--data-key="9" \
+--samples-key="9" \
 --seed=$SEED

@@ -18,11 +18,11 @@ source activate thejoker-paper
 srun python run-sampler.py -v --mpi -o \
 -n 2**28 -s 42 \
 -f ../cache/experiment4.h5 \
---save-key='fixed-jitter' \
+--samples-key='fixed-jitter' \
 --fixed-jitter='0 m/s'
 
 srun python run-sampler.py -v --mpi -o \
 -n 2**28 -s 42 \
 -f ../cache/experiment4.h5 \
---save-key='sample-jitter' \
+--samples-key='sample-jitter' \
 --log-jitter2-mean=10.5 --log-jitter2-std=1. --jitter-unit='m/s'

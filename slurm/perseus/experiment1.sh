@@ -20,11 +20,11 @@ python make-experiment1-data.py -s 1234
 srun python run-sampler.py -v --mpi -o \
 -n 2**28 -s 42 \
 -f ../cache/experiment1.h5 \
---save-key='fixed-jitter' \
+--samples-key='fixed-jitter' \
 --fixed-jitter='0 m/s'
 
 srun python run-sampler.py -v --mpi -o \
 -n 2**28 -s 42 \
 -f ../data/experiment1.h5 \
---save-key='sample-jitter'
+--samples-key='sample-jitter'
 --log-jitter2-mean=0 --log-jitter2-std=8 --jitter-unit='m/s'

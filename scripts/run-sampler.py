@@ -18,7 +18,7 @@ if not os.path.exists(os.path.abspath("../scripts")):
     raise RuntimeError("Script must be run from within the scripts directory.")
 
 def main(filename, pool, prior_samples_file, n_samples=1, seed=42,
-         read_key=None, save_key=None,
+         data_key=None, samples_key=None,
          overwrite=False, continue_sampling=False, tmp_prior=False,
          P_min=None, P_max=None, fixed_jitter=None,
          log_jitter2_mean=None, log_jitter2_std=None, jitter_unit=None):
@@ -58,13 +58,13 @@ def main(filename, pool, prior_samples_file, n_samples=1, seed=42,
         joker_pars_kw['jitter'] = float(val) * u.Unit(unit)
 
     # paths within HDF5 file
-    if read_key is not None:
-        data_path = 'data/{}'.format(read_key)
+    if data_key is not None:
+        data_path = 'data/{}'.format(data_key)
     else:
         data_path = 'data'
 
-    if save_key is not None:
-        samples_path = 'samples/{}'.format(save_key)
+    if samples_key is not None:
+        samples_path = 'samples/{}'.format(samples_key)
     else:
         samples_path = 'samples'
 
@@ -186,9 +186,9 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--num-samples", dest="n_samples", default=2**20,
                         type=str, help="Number of prior samples to use in rejection sampling.")
 
-    parser.add_argument("--read-key", dest="read_key", default=None,
+    parser.add_argument("--data-key", dest="data_key", default=None,
                         type=str, help="Path within HDF5 file to read the data.")
-    parser.add_argument("--save-key", dest="save_key", default=None,
+    parser.add_argument("--samples-key", dest="samples_key", default=None,
                         type=str, help="Path within HDF5 file to save the samples.")
 
     parser.add_argument("--fixed-jitter", dest="fixed_jitter", default=None, type=str,
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     if args.prior_filename is None:
         with tempfile.NamedTemporaryFile(dir=os.path.abspath("../cache")) as fp:
             main(filename=args.filename, pool=pool, n_samples=n_samples,
-                 read_key=args.read_key, save_key=args.save_key,
+                 data_key=args.data_key, samples_key=args.samples_key,
                  prior_samples_file=fp.name, tmp_prior=True,
                  seed=args.seed, overwrite=args.overwrite, continue_sampling=args.continue_,
                  P_min=args.P_min, P_max=args.P_max, fixed_jitter=args.fixed_jitter,
@@ -244,7 +244,7 @@ if __name__ == "__main__":
 
     else:
         main(filename=args.filename, pool=pool, n_samples=n_samples,
-             read_key=args.read_key, save_key=args.save_key,
+             data_key=args.data_key, samples_key=args.samples_key,
              prior_samples_file=args.prior_filename,
              seed=args.seed, overwrite=args.overwrite, continue_sampling=args.continue_,
              P_min=args.P_min, P_max=args.P_max, fixed_jitter=args.fixed_jitter,
