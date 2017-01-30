@@ -25,6 +25,6 @@ srun python run-sampler.py -v --mpi -o \
 
 srun python run-sampler.py -v --mpi -o \
 -n 2**28 -s 42 \
--f ../data/experiment1.h5 \
+-f ../cache/experiment1.h5 \
 --samples-key='sample-jitter'
 --log-jitter2-mean=0 --log-jitter2-std=8 --jitter-unit='m/s'

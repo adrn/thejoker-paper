@@ -14,6 +14,9 @@ module load openmpi/gcc/1.10.2/64
 
 source activate thejoker-paper
 
+# No seed needed because APOGEE data
+python make-experiment4-data.py
+
 # Run experiment 4!
 srun python run-sampler.py -v --mpi -o \
 -n 2**28 -s 42 \

@@ -24,12 +24,23 @@ srun python run-sampler.py -v --mpi -o \
 --data-key="a" \
 --fixed-jitter='0 m/s'
 
+# ---
+# Run, then continue
 srun python run-sampler.py -v --mpi -o \
 -n 2**28 -s 42 \
 -f ../cache/experiment2.h5 \
 --samples-key='fixed-jitter-b' \
 --data-key="b" \
 --fixed-jitter='0 m/s'
+
+srun python run-sampler.py -v --mpi -c \
+-n 2**28 -s 42 \
+-f ../cache/experiment2.h5 \
+--samples-key='fixed-jitter-b' \
+--data-key="b" \
+--fixed-jitter='0 m/s'
+
+# ---
 
 srun python run-sampler.py -v --mpi -o \
 -n 2**28 -s 42 \
