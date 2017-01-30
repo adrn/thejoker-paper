@@ -36,7 +36,7 @@ srun python continue-with-emcee.py -v --mpi -o \
 srun python run-sampler.py -v --mpi -c \
 -n 2**28 \
 -f ../cache/experiment3.h5 \
---read-key="7" \
---save-key="7" \
+--data-key="7" \
+--samples-key="7" \
 --seed=42 \
---fixed-jitter='0 m/s
+--fixed-jitter='0 m/s'
