@@ -3,13 +3,13 @@ import os
 import sys
 
 # Third-party
-from astropy import log as logger
 import astropy.units as u
 import h5py
 import numpy as np
 from schwimmbad import choose_pool
 
 # Project
+from thejoker.log import log as logger
 from thejoker.sampler import JokerParams, TheJoker, save_prior_samples
 from thejoker.data import RVData
 from thejoker.utils import quantity_to_hdf5, quantity_from_hdf5

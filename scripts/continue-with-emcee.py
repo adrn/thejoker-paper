@@ -10,47 +10,63 @@ import os
 import sys
 
 # Third-party
-from astropy import log as logger
 import astropy.units as u
 import emcee
 import h5py
 import numpy as np
+from schwimmbad import choose_pool
 
 # Project
-from thejoker import Paths
-paths = Paths()
-from thejoker import config
+from thejoker.log import log as logger
+from thejoker.sampler import JokerParams
 from thejoker.data import RVData
-from thejoker.units import default_units
-from thejoker.pool import choose_pool
+from thejoker.utils import quantity_to_hdf5, quantity_from_hdf5
 from thejoker.sampler import mcmc
-from thejoker.celestialmechanics import OrbitalParams
 
-def main(data_file, cache_filename, pool, n_steps, overwrite=False, seed=42, hdf5_key=None):
+if not os.path.exists(os.path.abspath("../scripts")):
+    raise RuntimeError("Script must be run from within the scripts directory.")
 
-    full_path = os.path.abspath(data_file)
-    output_filename = "{}.h5".format(os.path.splitext(cache_filename)[0])
-    _path,_basename = os.path.split(output_filename)
-    if not _path:
-        output_filename = os.path.join(paths.root, "cache", output_filename)
+# TODO: single filename, blah blah...
+def main(filename, pool, n_steps, overwrite=False, seed=42,
+         data_key=None, samples_key=None):
+
+    filename = os.path.abspath(filename)
 
     # make sure The Joker has already been run
-    if not os.path.exists(output_filename):
+    if not os.path.exists(filename):
         raise IOError("The Joker cache file '{}' can't be found! Are you sure you ran "
-                      "'run-sampler.py'?".format(output_filename))
+                      "'run-sampler.py'?".format(filename))
 
-    with h5py.File(output_filename, 'a') as f:
+    with h5py.File(filename, 'a') as root:
+        if data_key is not None:
+            data_path = 'data/{}'.format(data_key)
+        else:
+            data_path = 'data'
+
+        if samples_key is not None:
+            samples_path = 'samples/{}'.format(samples_key)
+        else:
+            samples_path = 'samples'
+
+        emcee_path = 'emcee/{}'.format(samples_key)
+
+        if samples_path not in root:
+            raise IOError("Key '{}' not in HDF5 file '{}'".format(samples_path, filename))
+
         # TODO:
         # jitter = f.attrs['fixed_jitter'] * u.m/u.s
 
-        if 'emcee' in f:
+        if emcee_path in root:
             if overwrite:
-                del f['emcee']
+                del root[emcee_path]
 
             else:
                 logger.info("emcee already run on this sample file.")
                 pool.close()
                 sys.exit(0)
+
+        elif 'emcee' not in root:
+            root.create_group('emcee')
 
     # do this after choosing pool so all processes don't have same seed
     if seed is not None:
@@ -58,22 +74,28 @@ def main(data_file, cache_filename, pool, n_steps, overwrite=False, seed=42, hdf
         np.random.seed(seed)
 
     # only accepts HDF5 data formats with units
-    logger.debug("Reading data from input file at '{}'".format(full_path))
-    with h5py.File(full_path, 'r') as f:
-        if hdf5_key is not None:
-            data = RVData.from_hdf5(f[hdf5_key])
-        else:
-            data = RVData.from_hdf5(f)
+    logger.debug("Reading data and cached samples from file at '{}'".format(filename))
+    with h5py.File(filename, 'r') as f:
+        data = RVData.from_hdf5(f[data_path])
 
-    logger.debug("Reading cached sample(s) from file at '{}'".format(output_filename))
-    opars = OrbitalParams.from_hdf5(output_filename)
+        # also read samples
+        samples = dict()
+        for key in f[samples_path].keys():
+            samples[key] = quantity_from_hdf5(f[samples_path], key)
+
+    n_joker_samples = len(samples['P'])
+
+    # TODO: need to load this from HDF5 file...
+    # HACK: fixed jitter
+    params = JokerParams(P_min=8*u.day, P_max=8192*u.day, anomaly_tol=1E-11,
+                         jitter=0.*u.m/u.s)
 
     # Fire up emcee
-    if len(opars) > 1:
-        P = np.median(opars.P.to(default_units['P']).value)
-        T = data._t.max() - data._t.min()
-        Delta = 4*P**2 / (2*np.pi*T)
-        P_rms = np.std(opars.P.to(default_units['P']).value)
+    if n_joker_samples > 1:
+        P = np.median(samples['P'])
+        T = data._t_bmjd.max() - data._t_bmjd.min()
+        Delta = 4*P**2 / (2*np.pi*T*u.day)
+        P_rms = np.std(samples['P'])
         logger.debug("Period rms for surviving samples: {}, Delta: {}".format(P_rms, Delta))
 
         if P_rms > Delta:
@@ -85,28 +107,24 @@ def main(data_file, cache_filename, pool, n_steps, overwrite=False, seed=42, hdf
     else:
         logger.debug("Only one surviving sample.")
 
-    # HACK: this is a major hack, only support fixed jitter at 0
-    fixed_jitter = True
-
     # transform samples to the parameters we'll sample using emcee
-    samples = opars.pack()
+    _names = 'P', 'phi0', 'ecc', 'omega', 'jitter', 'K', 'v0'
+    samples_vec = np.array([samples[k].value for k in _names]).T
+    samples_trans = mcmc.to_mcmc_params(samples_vec.T).T
 
-    if fixed_jitter: # HACK
-        samples = np.delete(samples, 4, axis=1)
+    # TODO HACK: to remove jitter, because it's fixed
+    samples_trans = np.delete(samples_trans, 5, axis=1)
 
-    samples_trans = mcmc.pack_mcmc(samples.T, fixed_jitter=fixed_jitter).T
-
-    if fixed_jitter: # HACK
-        samples_trans = np.delete(samples_trans, -1, axis=1)
-
-    j_max = np.argmax([mcmc.ln_posterior(s, data, fixed_jitter=fixed_jitter) for s in samples_trans])
+    j_max = np.argmax([mcmc.ln_posterior(s, params, data) for s in samples_trans])
     p0 = samples_trans[j_max]
 
-    n_walkers = config.defaults['M_min']
+    # HACK: config
+    M_min = 128
+    n_walkers = M_min
     p0 = emcee.utils.sample_ball(p0, 1E-5*np.abs(p0), size=n_walkers)
 
     sampler = emcee.EnsembleSampler(n_walkers, p0.shape[1],
-                                    lnpostfn=mcmc.ln_posterior, args=(data,fixed_jitter),
+                                    lnpostfn=mcmc.ln_posterior, args=(params,data),
                                     pool=pool)
 
     pos,prob,state = sampler.run_mcmc(p0, n_steps) # MAGIC NUMBER
@@ -115,12 +133,12 @@ def main(data_file, cache_filename, pool, n_steps, overwrite=False, seed=42, hdf
 
     pos = np.hstack((pos, np.zeros((pos.shape[0],1))))
     emcee_samples = mcmc.unpack_mcmc(pos.T)
-    with h5py.File(output_filename, 'a') as f:
-        g = f.create_group('emcee')
 
-        for i,(name,unit) in enumerate(OrbitalParams._name_to_unit.items()):
-            g.create_dataset(name, data=emcee_samples[i])
-            g[name].attrs['unit'] = str(unit)
+    with h5py.File(output_filename, 'a') as f:
+        # for i,(name,unit) in enumerate(OrbitalParams._name_to_unit.items()):
+        #     g.create_dataset(name, data=emcee_samples[i])
+        #     g[name].attrs['unit'] = str(unit)
+        pass
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -152,12 +170,12 @@ if __name__ == "__main__":
     group.add_argument("--mpi", dest="mpi", default=False,
                        action="store_true", help="Run with MPI.")
 
-    parser.add_argument("-f", "--file", dest="data_file", default=None, required=True,
+    parser.add_argument("-f", "--file", dest="filename", default=None, required=True,
                         type=str, help="Path to HDF5 data file to analyze.")
-    parser.add_argument("--hdf5-key", dest="hdf5_key", default=None,
-                        type=str, help="Path within an HDF5 file to the data.")
-    parser.add_argument("--name", dest="cache_name", default=None,
-                        type=str, help="Name to use when saving the cache file.")
+    parser.add_argument("--data-key", dest="data_key", default=None,
+                        type=str, help="Path within HDF5 file to read the data.")
+    parser.add_argument("--samples-key", dest="samples_key", default=None,
+                        type=str, help="Path within HDF5 file to save the samples.")
 
     # TODO: add other jitter options from run-sampler.py
     # THIS IS IGNORED!
@@ -189,5 +207,6 @@ if __name__ == "__main__":
     pool = choose_pool(mpi=args.mpi, processes=args.n_procs)
 
     # use a context manager so the prior samples file always gets deleted
-    main(data_file=args.data_file, cache_filename=args.cache_name, pool=pool,
-         n_steps=args.n_steps, hdf5_key=args.hdf5_key, seed=args.seed, overwrite=args.overwrite)
+    main(filename=args.filename, pool=pool, n_steps=args.n_steps,
+         seed=args.seed, overwrite=args.overwrite,
+         data_key=args.data_key, samples_key=args.samples_key)
