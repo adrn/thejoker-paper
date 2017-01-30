@@ -4,19 +4,35 @@ import matplotlib.pyplot as plt
 import numpy as np
 import corner
 
+from astropy.visualization import astropy_mpl_style
+mpl_style = astropy_mpl_style.copy()
+mpl_style['figure.figsize'] = (8,6)
+mpl_style['axes.grid'] = False
+mpl_style['lines.markeredgewidth'] = 0
+
+# bigger fonts
+mpl_style['axes.titlesize'] = 26
+mpl_style['axes.labelsize'] = 22
+mpl_style['xtick.labelsize'] = 18
+mpl_style['ytick.labelsize'] = 18
+
 # Project
-from thejoker import Paths
-paths = Paths()
 from thejoker.data import RVData
-from thejoker.celestialmechanics import OrbitalParams
 from thejoker.plot import plot_rv_curves, _truth_color
 
+# Colors
+truth_color = '#006837'
+prev_result_color = '#2166AC'
+
 # plot units
-samples_units = OrbitalParams._name_to_unit.copy()
-samples_units['K'] = u.km/u.s
-samples_units['v0'] = u.km/u.s
-samples_units['omega'] = u.degree
-samples_units['phi0'] = u.degree
+plot_units = dict()
+plot_units['P'] = u.day
+plot_units['phi0'] = u.degree
+plot_units['ecc'] = u.one
+plot_units['omega'] = u.degree
+plot_units['jitter'] = u.m/u.s
+plot_units['K'] = u.km/u.s
+plot_units['v0'] = u.km/u.s
 
 def make_rv_curve_figure(all_data, all_pars, truth_pars=None, rv_unit=u.km/u.s,
                          n_plot_curves=128, titles=None,
