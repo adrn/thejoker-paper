@@ -132,13 +132,26 @@ def main(filename, pool, n_steps, overwrite=False, seed=42,
     pool.close()
 
     pos = np.hstack((pos, np.zeros((pos.shape[0],1))))
-    emcee_samples = mcmc.unpack_mcmc(pos.T)
+    emcee_samples_vec = mcmc.from_mcmc_params(pos.T)
 
-    with h5py.File(output_filename, 'a') as f:
-        # for i,(name,unit) in enumerate(OrbitalParams._name_to_unit.items()):
-        #     g.create_dataset(name, data=emcee_samples[i])
-        #     g[name].attrs['unit'] = str(unit)
-        pass
+    import matplotlib.pyplot as plt
+    # import corner
+    # corner.corner(np.vstack(sampler.chain[:,:-128]))
+
+    nwalkers, nlinks, dim = sampler.chain.shape
+    for k in range(dim):
+        plt.figure()
+        for n in range(nwalkers):
+            plt.plot(sampler.chain[n,:,k], marker='', drawstyle='steps', alpha=0.1)
+
+    plt.show()
+
+    # TODO: turn vec into dict with units
+
+    with h5py.File(filename, 'a') as root:
+        f = root[emcee_path]
+        for key,val in emcee_samples.items():
+            quantity_to_hdf5(f, key, val)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
